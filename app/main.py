@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 from app.core.bootstrap import ensure_sqlite_compatibility, seed_incidents
 from app.core.config import get_settings
@@ -26,8 +27,21 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
-app.add_middleware(CorrelationIdMiddleware)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
+    docs_url='/docs' if settings.enable_openapi else None,
+    redoc_url='/redoc' if settings.enable_openapi else None,
+    openapi_url='/openapi.json' if settings.enable_openapi else None,
+)
+
+if settings.require_https:
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+if settings.enable_request_logging:
+    app.add_middleware(CorrelationIdMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
