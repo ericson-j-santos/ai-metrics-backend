@@ -28,6 +28,33 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Dependency integrity
+        run: pip check
+
+      - name: Compile Python sources
+        run: python -m compileall app tests
+
+      - name: Validate production settings guard rails
+        env:
+          APP_ENV: production
+          DATABASE_URL: sqlite:///./ai_metrics.db
+          CORS_ORIGINS: "*"
+          ENABLE_OPENAPI: "true"
+          REQUIRE_HTTPS: "false"
+        run: |
+          python - <<'PY'
+          from pydantic import ValidationError
+          from app.core.config import Settings
+
+          try:
+              Settings()
+          except ValidationError as exc:
+              message = str(exc)
+              assert 'DATABASE_URL não pode usar SQLite em production.' in message
+          else:
+              raise SystemExit('Production guard rails should reject unsafe settings')
+          PY
+
       - name: Run tests
         env:
           DATABASE_URL: sqlite:///./ai_metrics_test.db
